@@ -1,4 +1,4 @@
-package com.api.nico.api_papas_nico.compra_materia_prima.dto;
+package com.api.nico.api_papas_nico.compra_materia_prima.dto.request;
 
 import lombok.Data;
 

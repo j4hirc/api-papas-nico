@@ -1,7 +1,7 @@
 package com.api.nico.api_papas_nico.compra_comida.controller;
 
-import com.api.nico.api_papas_nico.compra_comida.dto.CompraComidaRequestDTO;
-import com.api.nico.api_papas_nico.compra_comida.dto.CompraComidaResponseDTO;
+import com.api.nico.api_papas_nico.compra_comida.dto.request.CompraComidaRequestDTO;
+import com.api.nico.api_papas_nico.compra_comida.dto.response.CompraComidaResponseDTO;
 import com.api.nico.api_papas_nico.compra_comida.service.CompraComidaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

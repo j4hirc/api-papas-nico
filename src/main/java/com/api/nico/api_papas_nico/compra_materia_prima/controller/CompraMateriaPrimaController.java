@@ -1,7 +1,7 @@
 package com.api.nico.api_papas_nico.compra_materia_prima.controller;
 
-import com.api.nico.api_papas_nico.compra_materia_prima.dto.CompraMateriaPrimaRequestDTO;
-import com.api.nico.api_papas_nico.compra_materia_prima.dto.CompraMateriaPrimaResponseDTO;
+import com.api.nico.api_papas_nico.compra_materia_prima.dto.request.CompraMateriaPrimaRequestDTO;
+import com.api.nico.api_papas_nico.compra_materia_prima.dto.response.CompraMateriaPrimaResponseDTO;
 import com.api.nico.api_papas_nico.compra_materia_prima.service.CompraMateriaPrimaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

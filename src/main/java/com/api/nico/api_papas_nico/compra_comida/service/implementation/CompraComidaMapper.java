@@ -1,7 +1,7 @@
 package com.api.nico.api_papas_nico.compra_comida.service.implementation;
 
-import com.api.nico.api_papas_nico.compra_comida.dto.CompraComidaResponseDTO;
-import com.api.nico.api_papas_nico.compra_comida.dto.DetalleCompraResponseDTO;
+import com.api.nico.api_papas_nico.compra_comida.dto.response.CompraComidaResponseDTO;
+import com.api.nico.api_papas_nico.compra_comida.dto.response.DetalleCompraResponseDTO;
 import com.api.nico.api_papas_nico.compra_comida.model.CabeceraCompraComida;
 import com.api.nico.api_papas_nico.compra_comida.model.DetalleCompraComida;
 import org.springframework.stereotype.Component;

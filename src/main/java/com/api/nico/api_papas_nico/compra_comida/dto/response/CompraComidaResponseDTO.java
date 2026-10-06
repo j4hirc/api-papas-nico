@@ -1,4 +1,4 @@
-package com.api.nico.api_papas_nico.compra_comida.dto;
+package com.api.nico.api_papas_nico.compra_comida.dto.response;
 
 import lombok.Data;
 

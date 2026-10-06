@@ -2,9 +2,8 @@ package com.api.nico.api_papas_nico.compra_comida.service.implementation;
 
 import com.api.nico.api_papas_nico.comidas.model.Comidas;
 import com.api.nico.api_papas_nico.comidas.repository.ComidaRepository;
-import com.api.nico.api_papas_nico.compra_comida.dto.CompraComidaRequestDTO;
-import com.api.nico.api_papas_nico.compra_comida.dto.CompraComidaResponseDTO;
-import com.api.nico.api_papas_nico.compra_comida.dto.DetalleCompraRequestDTO;
+import com.api.nico.api_papas_nico.compra_comida.dto.request.CompraComidaRequestDTO;
+import com.api.nico.api_papas_nico.compra_comida.dto.response.CompraComidaResponseDTO;
 import com.api.nico.api_papas_nico.compra_comida.model.CabeceraCompraComida;
 import com.api.nico.api_papas_nico.compra_comida.model.DetalleCompraComida;
 import com.api.nico.api_papas_nico.compra_comida.repository.CabeceraCompraRepository;

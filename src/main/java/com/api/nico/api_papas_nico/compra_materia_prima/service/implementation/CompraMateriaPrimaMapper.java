@@ -1,7 +1,7 @@
 package com.api.nico.api_papas_nico.compra_materia_prima.service.implementation;
 
-import com.api.nico.api_papas_nico.compra_materia_prima.dto.CompraMateriaPrimaResponseDTO;
-import com.api.nico.api_papas_nico.compra_materia_prima.dto.DetalleCompraMPResponseDTO;
+import com.api.nico.api_papas_nico.compra_materia_prima.dto.response.CompraMateriaPrimaResponseDTO;
+import com.api.nico.api_papas_nico.compra_materia_prima.dto.response.DetalleCompraMPResponseDTO;
 import com.api.nico.api_papas_nico.compra_materia_prima.model.CabeceraCompraMateriaPrima;
 import com.api.nico.api_papas_nico.compra_materia_prima.model.DetalleCompraMateriaPrima;
 import org.springframework.stereotype.Component;
