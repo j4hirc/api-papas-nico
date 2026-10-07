@@ -1,65 +1,75 @@
 package com.api.nico.api_papas_nico.materia_prima.service.implementation;
 
-
-import com.api.nico.api_papas_nico.materia_prima.dto.MateriaPrimaRequestDTO;
-import com.api.nico.api_papas_nico.materia_prima.dto.MateriaPrimaResponseDTO;
+import com.api.nico.api_papas_nico.materia_prima.dto.*;
 import com.api.nico.api_papas_nico.materia_prima.model.MateriaPrima;
 import com.api.nico.api_papas_nico.materia_prima.repository.MateriaPrimaRepository;
 import com.api.nico.api_papas_nico.materia_prima.service.MateriaPrimaService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class MateriaPrimaServiceImpl implements MateriaPrimaService {
 
-    private final MateriaPrimaRepository materiaPrimaRepository;
-    private final MateriaPrimaMapper materiaPrimaMapper;
-
+    private final MateriaPrimaRepository repository;
+    private final MateriaPrimaMapper mapper;
 
     @Override
+    @Transactional(readOnly = true)
     public List<MateriaPrimaResponseDTO> getAllMateriaPrima() {
-        List<MateriaPrima> materiaPrimaList = materiaPrimaRepository.findAll();
-        return materiaPrimaList.stream()
-                .map(materiaPrimaMapper::toResponseDTO)
+        return repository.findAll()
+                .stream()
+                .map(mapper::toResponseDTO)
                 .toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public MateriaPrimaResponseDTO getMateriaPrimaById(Long id) {
-        MateriaPrima materiaPrima = materiaPrimaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Materia Prima not found with id: " + id));
-
-        return materiaPrimaMapper.toResponseDTO(materiaPrima);
+        return mapper.toResponseDTO(buscar(id));
     }
 
     @Override
-    public MateriaPrimaResponseDTO createMateriaPrima(MateriaPrimaRequestDTO materiaPrimaRequestDTO) {
-
-        MateriaPrima materiaPrima = materiaPrimaMapper.toEntity(materiaPrimaRequestDTO);
-        MateriaPrima savedMateriaPrima = materiaPrimaRepository.save(materiaPrima);
-        return materiaPrimaMapper.toResponseDTO(savedMateriaPrima);
+    public MateriaPrimaResponseDTO createMateriaPrima(
+            MateriaPrimaRequestDTO dto
+    ) {
+        var c = mapper.toEntity(dto);
+        return mapper.toResponseDTO(repository.save(c));
     }
 
     @Override
-    public MateriaPrimaResponseDTO updateMateriaPrima(Long id, MateriaPrimaRequestDTO materiaPrimaRequestDTO) {
-        MateriaPrima existingMateriaPrima = materiaPrimaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Materia Prima not found with id: " + id));
+    public MateriaPrimaResponseDTO updateMateriaPrima(
+            Long id,
+            MateriaPrimaRequestDTO dto
+    ) {
+        var c = buscar(id);
+        c.setNombre(dto.getNombre());
+        c.setPrecio(dto.getPrecio());
 
-        existingMateriaPrima.setPrecio(materiaPrimaRequestDTO.getPrecio());
-        existingMateriaPrima.setNombre(materiaPrimaRequestDTO.getNombre());
-        MateriaPrima updatedMateriaPrima = materiaPrimaRepository.save(existingMateriaPrima);
-
-        return materiaPrimaMapper.toResponseDTO(updatedMateriaPrima);
+        return mapper.toResponseDTO(repository.save(c));
     }
 
     @Override
     public MateriaPrimaResponseDTO deleteMateriaPrima(Long id) {
-        MateriaPrima existingMateriaPrima = materiaPrimaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Materia Prima not found with id: " + id));
-        materiaPrimaRepository.delete(existingMateriaPrima);
-        return materiaPrimaMapper.toResponseDTO(existingMateriaPrima);
+        var c = buscar(id);
+        var respuesta = mapper.toResponseDTO(c);
+
+        repository.delete(c);
+        repository.flush();
+
+        return respuesta;
+    }
+
+    private MateriaPrima buscar(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Producto inexistente: " + id
+                ));
     }
 }

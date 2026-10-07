@@ -1,89 +1,105 @@
 package com.api.nico.api_papas_nico.comidas.service.implementation;
 
-import com.api.nico.api_papas_nico.comidas.dto.ComidaRequestDTO;
-import com.api.nico.api_papas_nico.comidas.dto.ComidaResponseDTO;
+import com.api.nico.api_papas_nico.comidas.dto.*;
 import com.api.nico.api_papas_nico.comidas.model.Comidas;
 import com.api.nico.api_papas_nico.comidas.repository.ComidaRepository;
 import com.api.nico.api_papas_nico.comidas.service.ComidaService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
+import java.io.IOException;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ComidaServiceImpl implements ComidaService {
 
-    private final ComidaRepository comidaRepository;
-    private final ComidaMapper comidaMapper;
-    private final SupabaseStorageService storageService;
-
+    private final ComidaRepository repository;
+    private final ComidaMapper mapper;
+    private final SupabaseStorageService storage;
 
     @Override
+    @Transactional(readOnly = true)
     public List<ComidaResponseDTO> getAllComidas() {
-        List<Comidas> comidas = comidaRepository.findAll();
-        return comidas.stream()
-                .map(comidaMapper::toResponseDTO)
+        return repository.findAll()
+                .stream()
+                .map(mapper::toResponseDTO)
                 .toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ComidaResponseDTO getComidaById(Long id) {
-        Comidas comidas = comidaRepository.findById(id).
-                orElseThrow(() -> new RuntimeException("Comida no encontrada con id: " + id));
-
-        return comidaMapper.toResponseDTO(comidas);
+        return mapper.toResponseDTO(buscar(id));
     }
 
     @Override
-    public ComidaResponseDTO createComida(ComidaRequestDTO comidaRequestDTO, MultipartFile imagen) {
-
-        Comidas comida = comidaMapper.toEntity(comidaRequestDTO);
+    public ComidaResponseDTO createComida(
+            ComidaRequestDTO dto,
+            MultipartFile imagen
+    ) {
+        var c = mapper.toEntity(dto);
 
         if (imagen != null && !imagen.isEmpty()) {
             try {
-                String urlImagen = storageService.uploadFile(imagen, "productos");
-                comida.setFoto_url(urlImagen);
-            } catch (Exception e) {
-                throw new RuntimeException("Error al subir la imagen del producto: " + e.getMessage());
+                c.setFoto_url(storage.uploadFile(imagen, "productos"));
+            } catch (IOException e) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "No se pudo subir la imagen",
+                        e
+                );
             }
         }
-        Comidas comidaSaved = comidaRepository.save(comida);
 
-        return comidaMapper.toResponseDTO(comidaSaved);
+        return mapper.toResponseDTO(repository.save(c));
     }
 
     @Override
-    public ComidaResponseDTO updateComida(Long id, ComidaRequestDTO comidaRequestDTO, MultipartFile imagen) {
-
-        Comidas comidas = comidaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Comida no encontrada con id: " + id));
-
-        comidas.setNombre(comidaRequestDTO.getNombre());
-        comidas.setPrecio(comidaRequestDTO.getPrecio());
+    public ComidaResponseDTO updateComida(
+            Long id,
+            ComidaRequestDTO dto,
+            MultipartFile imagen
+    ) {
+        var c = buscar(id);
+        c.setNombre(dto.getNombre());
+        c.setPrecio(dto.getPrecio());
 
         if (imagen != null && !imagen.isEmpty()) {
             try {
-                String urlImagen = storageService.uploadFile(imagen, "productos");
-                comidas.setFoto_url(urlImagen);
-            } catch (Exception e) {
-                throw new RuntimeException("Error al subir la nueva imagen: " + e.getMessage());
+                c.setFoto_url(storage.uploadFile(imagen, "productos"));
+            } catch (IOException e) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "No se pudo subir la imagen",
+                        e
+                );
             }
         }
 
-        Comidas comidaActualizada = comidaRepository.save(comidas);
-
-        return comidaMapper.toResponseDTO(comidaActualizada);
+        return mapper.toResponseDTO(repository.save(c));
     }
 
     @Override
     public ComidaResponseDTO deleteComida(Long id) {
-        Comidas comida = comidaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Comida no encontrada con id: " + id));
+        var c = buscar(id);
+        var respuesta = mapper.toResponseDTO(c);
 
-        comidaRepository.delete(comida);
+        repository.delete(c);
+        repository.flush();
 
-        return comidaMapper.toResponseDTO(comida);
+        return respuesta;
+    }
+
+    private Comidas buscar(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Producto inexistente: " + id
+                ));
     }
 }

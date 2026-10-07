@@ -1,95 +1,158 @@
 package com.api.nico.api_papas_nico.compra_materia_prima.service.implementation;
 
+import com.api.nico.api_papas_nico.common.Fechas;
 import com.api.nico.api_papas_nico.compra_materia_prima.dto.request.CompraMateriaPrimaRequestDTO;
 import com.api.nico.api_papas_nico.compra_materia_prima.dto.response.CompraMateriaPrimaResponseDTO;
-import com.api.nico.api_papas_nico.compra_materia_prima.model.CabeceraCompraMateriaPrima;
-import com.api.nico.api_papas_nico.compra_materia_prima.model.DetalleCompraMateriaPrima;
-import com.api.nico.api_papas_nico.compra_materia_prima.repository.CabeceraCompraMPRepository;
-import com.api.nico.api_papas_nico.compra_materia_prima.repository.DetalleCompraMPRepository;
+import com.api.nico.api_papas_nico.compra_materia_prima.model.*;
+import com.api.nico.api_papas_nico.compra_materia_prima.repository.*;
 import com.api.nico.api_papas_nico.compra_materia_prima.service.CompraMateriaPrimaService;
-import com.api.nico.api_papas_nico.materia_prima.model.MateriaPrima;
 import com.api.nico.api_papas_nico.materia_prima.repository.MateriaPrimaRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@Validated
 @RequiredArgsConstructor
-public class CompraMateriaPrimaServiceImpl implements CompraMateriaPrimaService {
+@Transactional(readOnly = true)
+public class CompraMateriaPrimaServiceImpl
+        implements CompraMateriaPrimaService {
 
-    private final CabeceraCompraMPRepository cabeceraRepository;
-    private final DetalleCompraMPRepository detalleRepository;
-    private final MateriaPrimaRepository materiaPrimaRepository;
+    private final CabeceraCompraMPRepository cabeceras;
+    private final DetalleCompraMPRepository detalles;
+    private final MateriaPrimaRepository productos;
     private final CompraMateriaPrimaMapper mapper;
+
     @Override
     @Transactional
-    public CompraMateriaPrimaResponseDTO createCompra(CompraMateriaPrimaRequestDTO requestDTO) {
+    public CompraMateriaPrimaResponseDTO createCompra(
+            CompraMateriaPrimaRequestDTO dto
+    ) {
+        return guardar(new CabeceraCompraMateriaPrima(), dto, List.of());
+    }
 
-        CabeceraCompraMateriaPrima cabecera = new CabeceraCompraMateriaPrima();
-        cabecera.setFechaCompra(requestDTO.getFechaCompra());
-        cabecera.setTotal(0.0);
-        CabeceraCompraMateriaPrima savedCabecera = cabeceraRepository.save(cabecera);
+    @Override
+    @Transactional
+    public CompraMateriaPrimaResponseDTO updateCompra(
+            Long id,
+            CompraMateriaPrimaRequestDTO dto
+    ) {
+        var c = cabeceras.bloquear(id).orElseThrow(() -> noExiste(id));
+        var viejos = detalles.findByCabeceraCompra_Id(id);
 
-        List<DetalleCompraMateriaPrima> detallesGuardados = new ArrayList<>();
-
-        if (requestDTO.getDetalles() != null && !requestDTO.getDetalles().isEmpty()) {
-
-            List<DetalleCompraMateriaPrima> detallesToSave = requestDTO.getDetalles().stream().map(detDTO -> {
-                MateriaPrima materiaPrima = materiaPrimaRepository.findById(detDTO.getMateriaPrimaId())
-                        .orElseThrow(() -> new RuntimeException("Materia Prima no encontrada con id: " + detDTO.getMateriaPrimaId()));
-
-                DetalleCompraMateriaPrima detalle = new DetalleCompraMateriaPrima();
-                detalle.setCabeceraCompra(savedCabecera);
-                detalle.setMateriaPrima(materiaPrima);
-                detalle.setCantidad(detDTO.getCantidad());
-
-                return detalle;
-            }).toList();
-
-            detallesGuardados = detalleRepository.saveAll(detallesToSave);
-
-            double totalCalculado = detallesGuardados.stream()
-                    .mapToDouble(detalle -> detalle.getMateriaPrima().getPrecio() * detalle.getCantidad())
-                    .sum();
-
-            savedCabecera.setTotal(totalCalculado);
+        if (c.getFecha() == null
+                || viejos.stream().anyMatch(d -> d.getImportePagado() == null)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Histórico incompleto: conciliar fecha/importes antes de editar"
+            );
         }
 
-        cabeceraRepository.save(savedCabecera);
+        return guardar(c, dto, viejos);
+    }
 
-        return mapper.toResponseDTO(savedCabecera, detallesGuardados);
+    private CompraMateriaPrimaResponseDTO guardar(
+            CabeceraCompraMateriaPrima c,
+            CompraMateriaPrimaRequestDTO dto,
+            List<DetalleCompraMateriaPrima> viejos
+    ) {
+        if (c.getId() == null || dto.getFechaCompra() != null) {
+            var f = Fechas.resolver(dto.getFechaCompra());
+            c.setFecha(f.toLocalDate());
+            c.setHora(f.toLocalTime());
+            c.setFechaCompra(f.toOffsetDateTime().toString());
+        }
+
+        List<DetalleCompraMateriaPrima> nuevos = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (var linea : dto.getDetalles()) {
+            var producto = productos.findById(linea.getMateriaPrimaId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Producto inexistente: " + linea.getMateriaPrimaId()
+                    ));
+
+            var d = new DetalleCompraMateriaPrima();
+            d.setCabeceraCompra(c);
+            d.setMateriaPrima(producto);
+            d.setCantidad(linea.getCantidad());
+            d.setUnidad(linea.getUnidad().trim());
+            d.setImportePagado(linea.getImportePagado());
+
+            total = total.add(d.getImportePagado());
+            nuevos.add(d);
+        }
+
+        c.setTotal(total);
+        cabeceras.save(c);
+
+        detalles.deleteAll(viejos);
+        detalles.flush();
+        detalles.saveAll(nuevos);
+
+        return mapper.toResponseDTO(c, nuevos);
     }
 
     @Override
-    public CompraMateriaPrimaResponseDTO getCompraById(Long cabeceraId) {
-        CabeceraCompraMateriaPrima cabecera = cabeceraRepository.findById(cabeceraId)
-                .orElseThrow(() -> new RuntimeException("Compra no encontrada con id: " + cabeceraId));
+    public CompraMateriaPrimaResponseDTO getCompraById(Long id) {
+        var c = cabeceras.findById(id).orElseThrow(() -> noExiste(id));
 
-        List<DetalleCompraMateriaPrima> detalles = detalleRepository.findByCabeceraCompra_Id(cabeceraId);
-        return mapper.toResponseDTO(cabecera, detalles);
+        return mapper.toResponseDTO(
+                c,
+                detalles.findByCabeceraCompra_Id(id)
+        );
     }
 
     @Override
-    public List<CompraMateriaPrimaResponseDTO> getAllCompras() {
-        List<CabeceraCompraMateriaPrima> cabeceras = cabeceraRepository.findAll();
+    public List<CompraMateriaPrimaResponseDTO> getAllCompras(
+            LocalDate desde,
+            LocalDate hasta
+    ) {
+        Fechas.rango(desde, hasta);
 
-        return cabeceras.stream().map(cabecera -> {
-            List<DetalleCompraMateriaPrima> detalles = detalleRepository.findByCabeceraCompra_Id(cabecera.getId());
-            return mapper.toResponseDTO(cabecera, detalles);
-        }).toList();
+        if ((desde == null) != (hasta == null)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Envía desde y hasta juntos"
+            );
+        }
+
+        var lista = desde == null
+                ? cabeceras.findAll()
+                : cabeceras.findByFechaBetweenOrderByFechaAscHoraAscIdAsc(
+                desde,
+                hasta
+        );
+
+        return lista.stream()
+                .map(c -> mapper.toResponseDTO(
+                        c,
+                        detalles.findByCabeceraCompra_Id(c.getId())
+                ))
+                .toList();
     }
 
     @Override
     @Transactional
-    public void deleteCompra(Long cabeceraId) {
-        CabeceraCompraMateriaPrima cabecera = cabeceraRepository.findById(cabeceraId)
-                .orElseThrow(() -> new RuntimeException("Compra no encontrada con id: " + cabeceraId));
+    public void deleteCompra(Long id) {
+        var c = cabeceras.bloquear(id).orElseThrow(() -> noExiste(id));
 
-        List<DetalleCompraMateriaPrima> detalles = detalleRepository.findByCabeceraCompra_Id(cabeceraId);
-        detalleRepository.deleteAll(detalles);
-        cabeceraRepository.delete(cabecera);
+        detalles.deleteAll(detalles.findByCabeceraCompra_Id(id));
+        detalles.flush();
+        cabeceras.delete(c);
+    }
+
+    private ResponseStatusException noExiste(Long id) {
+        return new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Operación inexistente: " + id
+        );
     }
 }

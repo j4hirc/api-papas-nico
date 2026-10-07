@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -28,17 +29,23 @@ public class MateriaPrimaController {
     }
 
     @PostMapping
-    public ResponseEntity<MateriaPrimaResponseDTO> createMateriaPrima(@RequestBody MateriaPrimaRequestDTO materiaPrimaRequestDTO) {
-        MateriaPrimaResponseDTO nuevaMateriaPrima = materiaPrimaService.createMateriaPrima(materiaPrimaRequestDTO);
+    public ResponseEntity<MateriaPrimaResponseDTO> createMateriaPrima(
+            @Valid @RequestBody MateriaPrimaRequestDTO materiaPrimaRequestDTO
+    ) {
+        MateriaPrimaResponseDTO nuevaMateriaPrima =
+                materiaPrimaService.createMateriaPrima(materiaPrimaRequestDTO);
+
         return new ResponseEntity<>(nuevaMateriaPrima, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<MateriaPrimaResponseDTO> updateMateriaPrima(
             @PathVariable Long id,
-            @RequestBody MateriaPrimaRequestDTO materiaPrimaRequestDTO) {
+            @Valid @RequestBody MateriaPrimaRequestDTO materiaPrimaRequestDTO
+    ) {
+        MateriaPrimaResponseDTO materiaPrimaActualizada =
+                materiaPrimaService.updateMateriaPrima(id, materiaPrimaRequestDTO);
 
-        MateriaPrimaResponseDTO materiaPrimaActualizada = materiaPrimaService.updateMateriaPrima(id, materiaPrimaRequestDTO);
         return ResponseEntity.ok(materiaPrimaActualizada);
     }
 

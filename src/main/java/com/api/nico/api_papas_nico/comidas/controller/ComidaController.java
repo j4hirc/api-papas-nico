@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -31,20 +32,24 @@ public class ComidaController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ComidaResponseDTO> createComida(
-            @RequestPart("comida") ComidaRequestDTO comidaRequestDTO,
-            @RequestPart(value = "imagen", required = false) MultipartFile imagen) {
+            @Valid @RequestPart("comida") ComidaRequestDTO comidaRequestDTO,
+            @RequestPart(value = "imagen", required = false) MultipartFile imagen
+    ) {
+        ComidaResponseDTO nuevaComida =
+                comidaService.createComida(comidaRequestDTO, imagen);
 
-        ComidaResponseDTO nuevaComida = comidaService.createComida(comidaRequestDTO, imagen);
         return new ResponseEntity<>(nuevaComida, HttpStatus.CREATED);
     }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ComidaResponseDTO> updateComida(
             @PathVariable Long id,
-            @RequestPart("comida") ComidaRequestDTO comidaRequestDTO,
-            @RequestPart(value = "imagen", required = false) MultipartFile imagen) {
+            @Valid @RequestPart("comida") ComidaRequestDTO comidaRequestDTO,
+            @RequestPart(value = "imagen", required = false) MultipartFile imagen
+    ) {
+        ComidaResponseDTO comidaActualizada =
+                comidaService.updateComida(id, comidaRequestDTO, imagen);
 
-        ComidaResponseDTO comidaActualizada = comidaService.updateComida(id, comidaRequestDTO, imagen);
         return ResponseEntity.ok(comidaActualizada);
     }
 

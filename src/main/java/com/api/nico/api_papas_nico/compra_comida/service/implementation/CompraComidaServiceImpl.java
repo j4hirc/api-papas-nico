@@ -1,100 +1,182 @@
 package com.api.nico.api_papas_nico.compra_comida.service.implementation;
 
-import com.api.nico.api_papas_nico.comidas.model.Comidas;
 import com.api.nico.api_papas_nico.comidas.repository.ComidaRepository;
+import com.api.nico.api_papas_nico.common.Fechas;
 import com.api.nico.api_papas_nico.compra_comida.dto.request.CompraComidaRequestDTO;
 import com.api.nico.api_papas_nico.compra_comida.dto.response.CompraComidaResponseDTO;
-import com.api.nico.api_papas_nico.compra_comida.model.CabeceraCompraComida;
-import com.api.nico.api_papas_nico.compra_comida.model.DetalleCompraComida;
-import com.api.nico.api_papas_nico.compra_comida.repository.CabeceraCompraRepository;
-import com.api.nico.api_papas_nico.compra_comida.repository.DetalleCompraRepository;
+import com.api.nico.api_papas_nico.compra_comida.model.*;
+import com.api.nico.api_papas_nico.compra_comida.repository.*;
 import com.api.nico.api_papas_nico.compra_comida.service.CompraComidaService;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@Validated
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CompraComidaServiceImpl implements CompraComidaService {
 
-    private final CabeceraCompraRepository cabeceraRepository;
-    private final DetalleCompraRepository detalleRepository;
-    private final ComidaRepository comidaRepository;
-    private final CompraComidaMapper compraMapper;
+    private final CabeceraCompraRepository cabeceras;
+    private final DetalleCompraRepository detalles;
+    private final ComidaRepository productos;
+    private final CompraComidaMapper mapper;
 
     @Override
     @Transactional
-    public CompraComidaResponseDTO createCompra(CompraComidaRequestDTO requestDTO) {
+    public CompraComidaResponseDTO createCompra(CompraComidaRequestDTO dto) {
+        return guardar(new CabeceraCompraComida(), dto, List.of());
+    }
 
-        CabeceraCompraComida cabecera = new CabeceraCompraComida();
-        cabecera.setFechaCompra(requestDTO.getFechaCompra());
-        cabecera.setTotal(0.0);
+    @Override
+    @Transactional
+    public CompraComidaResponseDTO updateCompra(
+            Long id,
+            CompraComidaRequestDTO dto
+    ) {
+        var c = cabeceras.bloquear(id).orElseThrow(() -> noExiste(id));
+        var viejos = detalles.findByCabeceraCompra_Id(id);
 
-        CabeceraCompraComida savedCabecera = cabeceraRepository.save(cabecera);
-
-        List<DetalleCompraComida> detallesGuardados = new ArrayList<>();
-
-        if (requestDTO.getDetalles() != null && !requestDTO.getDetalles().isEmpty()) {
-
-            List<DetalleCompraComida> detallesToSave = requestDTO.getDetalles().stream().map(detDTO -> {
-                Comidas comida = comidaRepository.findById(detDTO.getComidaId())
-                        .orElseThrow(() -> new RuntimeException("Comida no encontrada con ID: " + detDTO.getComidaId()));
-
-                DetalleCompraComida detalle = new DetalleCompraComida();
-                detalle.setCabeceraCompra(savedCabecera);
-                detalle.setComidaId(comida);
-                detalle.setCantidad(detDTO.getCantidad());
-
-                return detalle;
-            }).toList();
-
-            detallesGuardados = detalleRepository.saveAll(detallesToSave);
-
-            // 3. Calcular el total acumulado usando Streams sobre los registros ya guardados
-            double totalCalculado = detallesGuardados.stream()
-                    .mapToDouble(detalle -> detalle.getComidaId().getPrecio() * detalle.getCantidad())
-                    .sum();
-
-            savedCabecera.setTotal(totalCalculado);
+        if (c.getFecha() == null
+                || viejos.stream().anyMatch(d -> d.getPrecioUnitario() == null)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Histórico incompleto: conciliar fecha/importes antes de editar"
+            );
         }
 
-        cabeceraRepository.save(savedCabecera);
+        return guardar(c, dto, viejos);
+    }
 
-        return compraMapper.toResponseDTO(savedCabecera, detallesGuardados);
+    private CompraComidaResponseDTO guardar(
+            CabeceraCompraComida c,
+            CompraComidaRequestDTO dto,
+            List<DetalleCompraComida> viejos
+    ) {
+        if (c.getId() == null || dto.getFechaCompra() != null) {
+            var f = Fechas.resolver(dto.getFechaCompra());
+            c.setFecha(f.toLocalDate());
+            c.setHora(f.toLocalTime());
+            c.setFechaCompra(f.toOffsetDateTime().toString());
+        }
+
+        Map<Long, BigDecimal> anteriores = new HashMap<>();
+        for (var d : viejos) {
+            anteriores.put(d.getComidaId().getId(), d.getPrecioUnitario());
+        }
+
+        List<DetalleCompraComida> nuevos = new ArrayList<>();
+        Set<Long> ids = new HashSet<>();
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (var linea : dto.getDetalles()) {
+            if (!ids.add(linea.getComidaId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Producto repetido; agrupa su cantidad"
+                );
+            }
+
+            var producto = productos.findById(linea.getComidaId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Producto inexistente: " + linea.getComidaId()
+                    ));
+
+            BigDecimal precio = anteriores.getOrDefault(
+                    producto.getId(),
+                    producto.getPrecio()
+            );
+
+            if (precio == null || precio.signum() <= 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Producto sin precio válido"
+                );
+            }
+
+            var d = new DetalleCompraComida();
+            d.setCabeceraCompra(c);
+            d.setComidaId(producto);
+            d.setCantidad(linea.getCantidad());
+            d.setPrecioUnitario(precio);
+
+            total = total.add(
+                    precio.multiply(BigDecimal.valueOf(d.getCantidad()))
+            );
+
+            nuevos.add(d);
+        }
+
+        c.setTotal(total);
+        cabeceras.save(c);
+
+        detalles.deleteAll(viejos);
+        detalles.flush();
+        detalles.saveAll(nuevos);
+
+        return mapper.toResponseDTO(c, nuevos);
     }
 
     @Override
     public CompraComidaResponseDTO getCompraById(Long id) {
-        CabeceraCompraComida cabecera = cabeceraRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Compra no encontrada con id: " + id));
+        var c = cabeceras.findById(id).orElseThrow(() -> noExiste(id));
 
-        List<DetalleCompraComida> detalles = detalleRepository.findByCabeceraCompra_Id(id);
-
-        return compraMapper.toResponseDTO(cabecera, detalles);
+        return mapper.toResponseDTO(
+                c,
+                detalles.findByCabeceraCompra_Id(id)
+        );
     }
 
     @Override
-    public List<CompraComidaResponseDTO> getAllCompras() {
-        List<CabeceraCompraComida> cabeceras = cabeceraRepository.findAll();
+    public List<CompraComidaResponseDTO> getAllCompras(
+            LocalDate desde,
+            LocalDate hasta
+    ) {
+        Fechas.rango(desde, hasta);
 
-        return cabeceras.stream().map(cabecera -> {
-            List<DetalleCompraComida> detalles = detalleRepository.findByCabeceraCompra_Id(cabecera.getId());
-            return compraMapper.toResponseDTO(cabecera, detalles);
-        }).toList();
+        if ((desde == null) != (hasta == null)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Envía desde y hasta juntos"
+            );
+        }
+
+        var lista = desde == null
+                ? cabeceras.findAll()
+                : cabeceras.findByFechaBetweenOrderByFechaAscHoraAscIdAsc(
+                desde,
+                hasta
+        );
+
+        return lista.stream()
+                .map(c -> mapper.toResponseDTO(
+                        c,
+                        detalles.findByCabeceraCompra_Id(c.getId())
+                ))
+                .toList();
     }
 
     @Override
     @Transactional
     public void deleteCompra(Long id) {
-        CabeceraCompraComida cabecera = cabeceraRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Compra no encontrada con id: " + id));
+        var c = cabeceras.bloquear(id).orElseThrow(() -> noExiste(id));
 
-        List<DetalleCompraComida> detalles = detalleRepository.findByCabeceraCompra_Id(id);
-        detalleRepository.deleteAll(detalles);
+        detalles.deleteAll(detalles.findByCabeceraCompra_Id(id));
+        detalles.flush();
+        cabeceras.delete(c);
+    }
 
-        cabeceraRepository.delete(cabecera);
+    private ResponseStatusException noExiste(Long id) {
+        return new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Operación inexistente: " + id
+        );
     }
 }

@@ -1,27 +1,26 @@
 package com.api.nico.api_papas_nico.materia_prima.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.math.BigDecimal;
+import lombok.*;
 
 @Entity(name = "materia_prima")
-@Setter
 @Getter
-@AllArgsConstructor
+@Setter
 @NoArgsConstructor
+@AllArgsConstructor
 public class MateriaPrima {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank
+    @Size(max = 255)
     private String nombre;
 
-    private Double precio;
-
+    @DecimalMin("0.00")
+    @Digits(integer = 12, fraction = 2)
+    private BigDecimal precio;
 }

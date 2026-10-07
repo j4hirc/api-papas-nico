@@ -2,15 +2,12 @@ package com.api.nico.api_papas_nico.compra_comida.model;
 
 import com.api.nico.api_papas_nico.comidas.model.Comidas;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import java.math.BigDecimal;
+import lombok.*;
 
 @Entity(name = "detalle_compra_comida")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
 public class DetalleCompraComida {
 
@@ -27,4 +24,5 @@ public class DetalleCompraComida {
     private Comidas comidaId;
 
     private Integer cantidad;
+    private BigDecimal precioUnitario;
 }

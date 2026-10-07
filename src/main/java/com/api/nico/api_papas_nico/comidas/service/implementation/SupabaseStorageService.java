@@ -23,24 +23,50 @@ public class SupabaseStorageService {
 
     public String uploadFile(MultipartFile file, String folder) throws IOException {
         String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename != null ? originalFilename.substring(originalFilename.lastIndexOf(".")) : "";
-        String uniqueFileName = folder + "/" + UUID.randomUUID().toString() + extension;
 
-        String url = supabaseUrl + "/storage/v1/object/" + bucketName + "/" + uniqueFileName;
+        String extension =
+                originalFilename != null && originalFilename.lastIndexOf(".") >= 0
+                        ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                        : "";
+
+        String uniqueFileName = folder + "/" + UUID.randomUUID() + extension;
+
+        String url = supabaseUrl
+                + "/storage/v1/object/"
+                + bucketName
+                + "/"
+                + uniqueFileName;
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(supabaseKey);
-        headers.setContentType(MediaType.parseMediaType(file.getContentType() != null ? file.getContentType() : "application/octet-stream"));
+        headers.setContentType(MediaType.parseMediaType(
+                file.getContentType() != null
+                        ? file.getContentType()
+                        : "application/octet-stream"
+        ));
 
-        HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
+        HttpEntity<byte[]> requestEntity =
+                new HttpEntity<>(file.getBytes(), headers);
 
         RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                requestEntity,
+                String.class
+        );
 
         if (response.getStatusCode().is2xxSuccessful()) {
-            return supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + uniqueFileName;
-        } else {
-            throw new RuntimeException("Error al subir el archivo a Supabase: " + response.getBody());
+            return supabaseUrl
+                    + "/storage/v1/object/public/"
+                    + bucketName
+                    + "/"
+                    + uniqueFileName;
         }
+
+        throw new RuntimeException(
+                "Error al subir el archivo a Supabase: " + response.getBody()
+        );
     }
 }

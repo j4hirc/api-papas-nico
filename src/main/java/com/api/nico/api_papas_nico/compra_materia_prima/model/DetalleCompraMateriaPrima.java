@@ -2,15 +2,12 @@ package com.api.nico.api_papas_nico.compra_materia_prima.model;
 
 import com.api.nico.api_papas_nico.materia_prima.model.MateriaPrima;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import java.math.BigDecimal;
+import lombok.*;
 
 @Entity(name = "detalle_compra_materia_prima")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
 public class DetalleCompraMateriaPrima {
 
@@ -26,5 +23,9 @@ public class DetalleCompraMateriaPrima {
     @JoinColumn(name = "materia_prima_id", nullable = false)
     private MateriaPrima materiaPrima;
 
-    private Integer cantidad;
+    @Column(precision = 12, scale = 3)
+    private BigDecimal cantidad;
+
+    private String unidad;
+    private BigDecimal importePagado;
 }

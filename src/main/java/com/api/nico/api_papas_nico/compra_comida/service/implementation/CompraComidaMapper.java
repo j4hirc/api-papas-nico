@@ -1,35 +1,49 @@
 package com.api.nico.api_papas_nico.compra_comida.service.implementation;
 
-import com.api.nico.api_papas_nico.compra_comida.dto.response.CompraComidaResponseDTO;
-import com.api.nico.api_papas_nico.compra_comida.dto.response.DetalleCompraResponseDTO;
-import com.api.nico.api_papas_nico.compra_comida.model.CabeceraCompraComida;
-import com.api.nico.api_papas_nico.compra_comida.model.DetalleCompraComida;
-import org.springframework.stereotype.Component;
-
+import com.api.nico.api_papas_nico.common.Fechas;
+import com.api.nico.api_papas_nico.compra_comida.dto.response.*;
+import com.api.nico.api_papas_nico.compra_comida.model.*;
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
 @Component
 public class CompraComidaMapper {
 
-    public CompraComidaResponseDTO toResponseDTO(CabeceraCompraComida cabecera, List<DetalleCompraComida> detalles) {
-        CompraComidaResponseDTO dto = new CompraComidaResponseDTO();
-        dto.setId(cabecera.getId());
-        dto.setFechaCompra(cabecera.getFechaCompra());
-        dto.setTotal(cabecera.getTotal());
+    public CompraComidaResponseDTO toResponseDTO(
+            CabeceraCompraComida c,
+            List<DetalleCompraComida> detalles
+    ) {
+        var r = new CompraComidaResponseDTO();
 
-        List<DetalleCompraResponseDTO> detallesDTO = detalles.stream().map(detalle -> {
-            DetalleCompraResponseDTO detDTO = new DetalleCompraResponseDTO();
-            detDTO.setId(detalle.getId());
-            detDTO.setComidaId(detalle.getComidaId().getId());
-            detDTO.setNombreComida(detalle.getComidaId().getNombre());
-            detDTO.setCantidad(detalle.getCantidad());
-            detDTO.setSubtotal(detalle.getComidaId().getPrecio() * detalle.getCantidad());
-            return detDTO;
-        }).collect(Collectors.toList());
+        r.setId(c.getId());
+        r.setFechaCompra(
+                Fechas.mostrar(c.getFecha(), c.getHora(), c.getFechaCompra())
+        );
+        r.setHoraConocida(c.getHora() != null);
+        r.setTotal(c.getTotal());
+        r.setDetalles(detalles.stream().map(this::linea).toList());
 
-        dto.setDetalles(detallesDTO);
-        return dto;
+        return r;
     }
 
+    private DetalleCompraResponseDTO linea(DetalleCompraComida d) {
+        var r = new DetalleCompraResponseDTO();
+
+        r.setId(d.getId());
+        r.setComidaId(d.getComidaId().getId());
+        r.setNombreComida(d.getComidaId().getNombre());
+        r.setCantidad(d.getCantidad());
+        r.setPrecioUnitario(d.getPrecioUnitario());
+
+        r.setSubtotal(
+                d.getPrecioUnitario() == null
+                        ? null
+                        : d.getPrecioUnitario().multiply(
+                        BigDecimal.valueOf(d.getCantidad())
+                )
+        );
+
+        return r;
+    }
 }

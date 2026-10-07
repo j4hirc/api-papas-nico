@@ -1,40 +1,42 @@
 package com.api.nico.api_papas_nico.compra_materia_prima.service.implementation;
 
-import com.api.nico.api_papas_nico.compra_materia_prima.dto.response.CompraMateriaPrimaResponseDTO;
-import com.api.nico.api_papas_nico.compra_materia_prima.dto.response.DetalleCompraMPResponseDTO;
-import com.api.nico.api_papas_nico.compra_materia_prima.model.CabeceraCompraMateriaPrima;
-import com.api.nico.api_papas_nico.compra_materia_prima.model.DetalleCompraMateriaPrima;
-import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
+import com.api.nico.api_papas_nico.common.Fechas;
+import com.api.nico.api_papas_nico.compra_materia_prima.dto.response.*;
+import com.api.nico.api_papas_nico.compra_materia_prima.model.*;
 import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
 @Component
 public class CompraMateriaPrimaMapper {
 
-    public CompraMateriaPrimaResponseDTO toResponseDTO(CabeceraCompraMateriaPrima cabecera, List<DetalleCompraMateriaPrima> detalles) {
-        CompraMateriaPrimaResponseDTO dto = new CompraMateriaPrimaResponseDTO();
-        dto.setId(cabecera.getId());
-        dto.setFechaCompra(cabecera.getFechaCompra());
-        dto.setTotal(cabecera.getTotal());
+    public CompraMateriaPrimaResponseDTO toResponseDTO(
+            CabeceraCompraMateriaPrima c,
+            List<DetalleCompraMateriaPrima> detalles
+    ) {
+        var r = new CompraMateriaPrimaResponseDTO();
 
-        if (detalles != null && !detalles.isEmpty()) {
-            List<DetalleCompraMPResponseDTO> detallesDTO = detalles.stream().map(detalle -> {
-                DetalleCompraMPResponseDTO detDTO = new DetalleCompraMPResponseDTO();
-                detDTO.setId(detalle.getId());
-                detDTO.setMateriaPrimaId(detalle.getMateriaPrima().getId());
-                detDTO.setNombreMateriaPrima(detalle.getMateriaPrima().getNombre());
-                detDTO.setCantidad(detalle.getCantidad());
-                detDTO.setSubtotal(detalle.getMateriaPrima().getPrecio() * detalle.getCantidad());
-                return detDTO;
-            }).collect(Collectors.toList());
+        r.setId(c.getId());
+        r.setFechaCompra(
+                Fechas.mostrar(c.getFecha(), c.getHora(), c.getFechaCompra())
+        );
+        r.setHoraConocida(c.getHora() != null);
+        r.setTotal(c.getTotal());
+        r.setDetalles(detalles.stream().map(this::linea).toList());
 
-            dto.setDetalles(detallesDTO);
-        } else {
-            dto.setDetalles(new ArrayList<>());
-        }
+        return r;
+    }
 
-        return dto;
+    private DetalleCompraMPResponseDTO linea(DetalleCompraMateriaPrima d) {
+        var r = new DetalleCompraMPResponseDTO();
+
+        r.setId(d.getId());
+        r.setMateriaPrimaId(d.getMateriaPrima().getId());
+        r.setNombreMateriaPrima(d.getMateriaPrima().getNombre());
+        r.setCantidad(d.getCantidad());
+        r.setUnidad(d.getUnidad());
+        r.setImportePagado(d.getImportePagado());
+        r.setSubtotal(d.getImportePagado());
+
+        return r;
     }
 }

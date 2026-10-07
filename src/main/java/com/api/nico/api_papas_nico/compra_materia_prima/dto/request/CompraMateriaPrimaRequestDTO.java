@@ -1,11 +1,17 @@
 package com.api.nico.api_papas_nico.compra_materia_prima.dto.request;
 
-import lombok.Data;
-
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 import java.util.List;
+import lombok.Data;
 
 @Data
 public class CompraMateriaPrimaRequestDTO {
+
     private String fechaCompra;
-    private List<DetalleCompraMPRequestDTO> detalles;
+
+    @NotEmpty
+    @Size(max = 200)
+    @Valid
+    private List<@NotNull DetalleCompraMPRequestDTO> detalles;
 }
